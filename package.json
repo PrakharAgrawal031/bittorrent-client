@@ -8,5 +8,11 @@
   "keywords": [],
   "author": "",
   "license": "ISC",
-  "description": ""
+  "description": "",
+  "dependencies": {
+    "bencode": "^4.0.0",
+    "parse-torrent": "^11.0.17",
+    "peerflix": "^0.39.0",
+    "torrent-parser": "^1.2.0"
+  }
 }
