@@ -5,7 +5,8 @@ function parsetorrentfile(filename) {
     try {
         const torrentBuffer = fs.readFileSync(filename);
         const torrent = bencode.decode(torrentBuffer);
-
+        console.log("content in torrent:");
+        console.log(torrent);
         const announce = torrent.announce ? torrent.announce.toString() : "No announce URL available";
         const info = torrent.info || {};
         const pieceLength = info.piece_length || "No piece length available";
@@ -13,7 +14,6 @@ function parsetorrentfile(filename) {
         const fileName = info.name ? info.name.toString() : "No file name available";
         const fileLength = info.length || "No file length available";
 
-        // Output the extracted information
         console.log("Content in announce: ");
         console.log(announce);
         console.log("Content in info: ");
@@ -35,4 +35,4 @@ function parsetorrentfile(filename) {
 
 const result = parsetorrentfile('gta5.torrent');
 console.log("Parsed torrent result:");
-console.log(result); 
+console.log(result);
