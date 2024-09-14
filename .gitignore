@@ -1,6 +1,6 @@
-gta5.torrent
-big-buck-bunny.torrent
-cosmos-laundromat.torrent
+*.torrent
+testing.js
+archive
 
 # Logs
 logs
