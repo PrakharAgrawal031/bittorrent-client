@@ -2,7 +2,7 @@ const dgram = require("dgram");
 const { Buffer } = require("buffer");
 const urlParse = require("url");
 const crypto = require("crypto");
-const torrentParser = require("./torrent-parser.js");
+const torrentParser = require("../archive/torrent-parser.js");
 const util = require("./util.js");
 
 module.exports.getpeers = (torrent, callback) => {
@@ -88,6 +88,25 @@ function buildAnnounceReq(connectionId, torrent, port = 6881) {
   return buf;
 }
 
-function parseAnnounceResp() {
-  //..
+function parseAnnounceResp(response) {
+  function group(iterable, groupSize){
+    let group = []
+    for(let i = 0; i<iterable.length; i+=groupSize){
+      group.push(iterable.slice(i, i+groupSize))
+    }
+    return group;
+  }
+
+  return {
+    action: response.readUInt32BE(0),
+    transactionId: response.readUInt32BE(4),
+    leechers: response.readUInt32BE(8),
+    seeders: response.readUInt32BE(12),
+    peers: group(response.slice(20), 6).map(address => {
+      return {
+        ip: address.slice(0, 4).join('.'),
+        port: address.readUInt16BE(4)
+      }
+    })
+  }
 }
