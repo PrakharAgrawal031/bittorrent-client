@@ -1,26 +1,35 @@
+'use strict';
 const dgram = require("dgram");
 const { Buffer } = require("buffer");
-const urlParse = require("url");
+const {URL } = require("url");
 const crypto = require("crypto");
-const torrentParser = require("../archive/torrent-parser.js");
+const torrentParser = require("./torrent-parser.js");
 const util = require("./util.js");
 
 module.exports.getpeers = (torrent, callback) => {
   const socket = dgram.createSocket("udp4");
   const url = torrent.announce.toString("utf8");
+  console.log("Tracker url: " + url)
 
-  try {
-    udpSend(socket, buildConnReq, url);
-  } catch (error) {
-    console.error("Error sending connection request: " + error.message);
-  }
+  udpSend(socket, buildConnReq(), url); //sending request
+  //message: event emitted after udp socket gets the message;
+  //response: buffer containing the data recieved from tracker
+  console.log("Build connection request sent successfully");
+  
 
-  socket.on("message", (response) => {
+  socket.on("message", (response) => { //recieving message
+    console.log("Received response from tracker");
+
     if (resType(response) === "connect") {
-      const connResponse = parseConnResp(response);
-      const announceRequest = buildAnnounceReq(connResponse.connectionId);
+      console.log("Restype = Connect")
+      const connResponse = parseConnResp(response); //parsing response
+      const announceRequest = buildAnnounceReq(connResponse.connectionId, torrent); // parse announce request
       udpSend(socket, announceRequest, url);
-    } else if (resType(response) === "announce") {
+      console.log('Announce request sent to tracker')
+    } 
+
+    else if (resType(response) === "announce") {
+      console.log("Recieved announce response from tracker")
       const announceResponse = parseAnnounceResp(response);
       callback(announceResponse.peers);
     }
@@ -28,8 +37,9 @@ module.exports.getpeers = (torrent, callback) => {
 };
 
 function udpSend(socket, message, rawUrl, callback = () => {}) {
-  const url = urlParse(rawUrl);
-  socket.send(message, 0, message.length, url.port, url.host, callback);
+  const url = new URL(rawUrl);
+  const port = url.port || 6881;
+  socket.send(message, 0, message.length, port, url.hostname, callback);
 }
 
 function resType(response) {
@@ -39,7 +49,7 @@ function resType(response) {
 }
 
 function buildConnReq() {
-  const buf = Buffer.alloc(16);
+  const buf = Buffer.allocUnsafe(16);
 
   buf.writeUInt32BE(0x417, 0);
   buf.writeUInt32BE(0x27101980, 4);
@@ -79,7 +89,7 @@ function buildAnnounceReq(connectionId, torrent, port = 6881) {
   // event
   buf.writeUInt32BE(0, 80);
   // ip address
-  buf.writeUInt32BE(0, 80);
+  buf.writeUInt32BE(0, 84);
   // key
   crypto.randomBytes(4).copy(buf, 88);
   // num want

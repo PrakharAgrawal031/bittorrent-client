@@ -3,31 +3,44 @@
 const fs = require("fs");
 const bencode = require("bencode");
 const crypto = require("crypto");
-// const BigInt = require('bigint');
-module.exports.open = (filepath) => {
+const BigNumber = require("bignumber.js");
+const open = (filepath) => {
   return bencode.decode(fs.readFileSync(filepath));
 };
 
-function bigIntToBuffer(value, size = 8) {
-  const buffer = Buffer.alloc(size);
+// function bigIntToBuffer(value, size = 8) {
+//   const buffer = Buffer.alloc(size);
 
-  for (let i = size - 1; i >= 0; i--) {
-    buffer[i] = Number(value & 0xffn); // Get the least significant byte
-    value >>= 8n; // Shift the value right by 8 bits
-  }
+//   for (let i = size - 1; i >= 0; i--) {
+//     buffer[i] = Number(value & 0xffn); // Get the least significant byte
+//     value >>= 8n; // Shift the value right by 8 bits
+//   }
 
-  return buffer;
-}
+//   return buffer;
+// }
 
-module.exports.size = (torrent) => {
+//Used bignumber.js instead of above code
+
+const size = (torrent) => {
   const size = torrent.info.files
-    ? torrent.info.files.map((file) => file.length).reduce((a, b) => a + b)
-    : torrent.info.length;
+    ? torrent.info.files
+        .map((file) => new BigNumber(file.length))
+        .reduce((a, b) => a.plus(b), new BigNumber(0))
+    : new BigNumber(torrent.info.length);
 
-  return bigIntToBuffer(BigInt(size), 8); // Pass 8 as the fixed buffer size
+  const sizeBuffer = Buffer.alloc(8);
+  sizeBuffer.writeBigUInt64BE(BigInt(size.toFixed()))
+
+  return sizeBuffer;
 };
 
-module.exports.infoHash = (torrent) => {
+const infoHash = (torrent) => {
   const info = bencode.encode(torrent.info);
   return crypto.createHash("sha1").update(info).digest();
+};
+
+module.exports = {
+  open,
+  size,
+  infoHash,
 };
