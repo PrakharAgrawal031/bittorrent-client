@@ -10,7 +10,7 @@ const util = require("./util.js");
 const buildHandshake = (torrent) => {
   const buffer = Buffer.alloc(68);
 
-  buffer.writeUInt8(18, 0); //pstrlen
+  buffer.writeUInt8(19, 0); //pstrlen
   buffer.write("BitTorrent protocol", 1); //pstr as per BitTorrent Specifications wiki
   buffer.writeUint32BE(0, 20); //reserved 4bytes +
   buffer.writeUint32BE(0, 24); //reserved 4bytes
