@@ -1,6 +1,6 @@
 "use strict";
 const fs = require("fs");
-const message = require("./message.js");
+const message = require('./message.js')
 const Pieces = require("./pieces.js");
 const Queue = require("./queue.js");
 const net = require("net");
@@ -71,11 +71,11 @@ function onWholeMssg(socket, peer_ip, callback) {
   });
 }
 
-function mssgHandler(message, socket, pieces, queue, torrent, file) {
-  if (isHandshake(message)) {
+function mssgHandler(mssg, socket, pieces, queue, torrent, file) {
+  if (isHandshake(mssg)) {
     socket.write(message.buildInterested());
   } else {
-    const m = message.parse(message);
+    const m = message.parse(mssg);
     switch (m.id) {
       case 0:
         chokeHandler(socket);
@@ -175,4 +175,6 @@ function requestPiece(socket, pieces, queue) {
   }
 }
 
-module.exports = main;
+module.exports = {
+  main
+}

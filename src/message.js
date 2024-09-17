@@ -128,7 +128,7 @@ const buildPort = (payload) => {
   return buffer;
 };
 
-const parse = (message) => {
+const parse = message => {
   const id = message.length > 4 ? message.readInt8(4) : null;
   let payload = message.length > 5 ? message.subarray(5) : null;
   if (id === 6 || id === 7 || id === 0) {
@@ -160,5 +160,5 @@ module.exports = {
   buildPiece,
   buildCancel,
   buildPort,
-  parse,
+  parse
 };
