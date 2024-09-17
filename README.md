@@ -34,19 +34,13 @@ This is a BitTorrent client implemented in Node.js. The client can parse `.torre
 2. Run the client:
 
     ```bash
-    node torrent_client.js
+    npm start <path-to-torrent-file>
     ```
 
-3. Example code for parsing and fetching peers:
+## Example
 
-    ```javascript
-    const torrentParser = require('./torrent_parser');  // Adjust the path as needed
-    const trackerCommunicator = require('./tracker_communicator');  // Adjust the path as needed
+![Output Example](example.png)
 
-    const torrentFile = 'example.torrent';  // Replace with your .torrent file path
-    const torrentInfo = torrentParser.parseTorrent(torrentFile);
-    trackerCommunicator.getPeersFromTracker(torrentInfo);
-    ```
 
 ## Roadmap
 - [ ] Implement peer handshaking.
