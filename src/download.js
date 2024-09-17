@@ -8,7 +8,7 @@ const Buffer = require("buffer").Buffer;
 const tracker = require("./tracker.js");
 
 const main = (torrent, path) => {
-  tracker.getpeers(torrent, (peers) => {
+  tracker.getpeers(torrent, peers => {
     const pieces = new Pieces(torrent);
     const file = fs.openSync(path, "w");
     peers.forEach(peer => handlePeer(peer, torrent, pieces, file));
@@ -43,7 +43,7 @@ function handlePeer(peer, torrent, pieces, file) {
   });
 
   const queue = new Queue(torrent);
-  onWholeMssg(socket, peer.ip, mssg =>
+  onWholeMssg(socket, peer.ip, (mssg) =>
     mssgHandler(mssg, socket, pieces, queue, torrent, file)
   );
 }
@@ -60,8 +60,8 @@ function onWholeMssg(socket, peer_ip, callback) {
     savedBuffer = Buffer.concat([savedBuffer, recvBuffer]);
 
     while (savedBuffer.length >= 4 && savedBuffer.length >= mssgLength()) {
-      callback(savedBuffer.subarray(0, mssgLength()));
-      savedBuffer = savedBuffer.subarray(mssgLength());
+      callback(savedBuffer.slice(0, mssgLength()));
+      savedBuffer = savedBuffer.slice(mssgLength());
       handshake = false;
     }
   });
@@ -134,22 +134,14 @@ function bitfieldHandler(socket, pieces, queue, payload) {
 
 function pieceHandler(socket, pieces, queue, torrent, file, pieceResponse) {
   pieces.printPercentDone();
-  console.log(`Received piece response with index: ${pieceResponse.index} and begin: ${pieceResponse.begin}`);
 
   pieces.addRecieved(pieceResponse);
 
   const offset =
-    pieceResponse.index * torrent.info[" piece length "] + pieceResponse.begin;
-  fs.writeFile(
-    file,
-    pieceResponse.block,
-    0,
-    pieceResponse.block.length,
-    offset,
-    (err) => {
-      if (err) console.error("Error writing to file:", err);
-    }
-  );
+    pieceResponse.index * torrent.info["piece length"] + pieceResponse.begin;
+    fs.write(file, pieceResponse.block, 0, pieceResponse.block.length, offset, (err) => {
+      if (err) console.error(`Error writing to file `, err);
+    });
 
   if (pieces.isDone()) {
     console.log("Download Complete");
