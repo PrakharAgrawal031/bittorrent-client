@@ -1,150 +1,235 @@
 "use strict";
 
-const { Buffer } = require("buffer");
-const torrentParser = require("./torrent-parser.js");
-const util = require("./util.js");
+const Buffer = require("buffer").Buffer;
+const torrentParser = require("./torrent-parser");
+const util = require("./util");
 
-//Hanshake is the first message sent by client. size = 49+length(pstr) bytes.
-//handshake: <pstrlen><pstr><reserved><info_hash><peer_id>
+/*
+    The handshake is a required message and must be the first message transmitted by the client. It is (49+len(pstr)) bytes long.
 
+    handshake: <pstrlen><pstr><reserved><info_hash><peer_id>
+*/
 const buildHandshake = (torrent) => {
-  const buffer = Buffer.alloc(68);
-
-  buffer.writeUInt8(19, 0); //pstrlen
-  buffer.write("BitTorrent protocol", 1); //pstr as per BitTorrent Specifications wiki
-  buffer.writeUint32BE(0, 20); //reserved 4bytes +
-  buffer.writeUint32BE(0, 24); //reserved 4bytes
-  torrentParser.infoHash(torrent).copy(buffer, 28); //infoHash
-  util.genId().copy(buffer, 48); //peerID
-  return buffer;
+  const buf = Buffer.alloc(68);
+  // pstrlen
+  buf.writeUInt8(19, 0);
+  // pstr
+  buf.write("BitTorrent protocol", 1);
+  // reserved
+  buf.writeUInt32BE(0, 20);//4bytes+
+  buf.writeUInt32BE(0, 24);//4bytes
+  // info hash
+  torrentParser.infoHash(torrent).copy(buf, 28);
+  // peer id
+  util.genId().copy(buf, 48);
+  return buf;
 };
 
-// All other messages will take form of <length prefix><messageID><payload>
-//Length prefix = 4bytes
-//Message ID = single decimal byte
-//Payload = Depends on message
+/*
+    All of the remaining messages in the protocol take the form of <length prefix><message ID><payload>.
+    The length prefix is a four byte big-endian value.
+    The message ID is a single decimal byte.
+    The payload is message dependent.
+*/
 
-const buildKeepAlive = () => Buffer.alloc(4); //sent repeatedly in a certain time interval(generally 2 mins) to keep connection alive.
+/*
+    keep-alive: <len=0000>
+    The keep-alive message is a message with zero bytes, specified with the length prefix set to zero.
+    There is no message ID and no payload. Peers may close a connection if they receive no messages 
+    (keep-alive or any other message) for a certain period of time, so a keep-alive message must be 
+    sent to maintain the connection alive if no command have been sent for a given amount of time.
+    This amount of time is generally two minutes.
+*/
+const buildKeepAlive = () => Buffer.alloc(4);
 
+/*
+    choke: <len=0001><id=0>
+    The choke message is fixed-length and has no payload.
+*/
 const buildChoke = () => {
-  //fixed length, no payload.
-  //Choke: <len=0001><id=0>
-  const buffer = Buffer.alloc(5);
-  buffer.writeUInt32BE(1, 0);
-  buffer.writeUInt8(0, 4); //ID
-  return buffer;
+  const buf = Buffer.alloc(5);
+  // length
+  buf.writeUInt32BE(1, 0);
+  // id
+  buf.writeUInt8(0, 4);
+  return buf;
 };
 
+/*
+    unchoke: <len=0001><id=1>
+    The unchoke message is fixed-length and has no payload.
+*/
 const buildUnchoke = () => {
-  //fixed length, no payload.
-  //Unchoke: <len=0001><id=1>
-  const buffer = Buffer.alloc(5);
-  buffer.writeUInt32BE(1, 0);
-  buffer.writeUInt8(1, 4); //ID
-  return buffer;
+  const buf = Buffer.alloc(5);
+  // length
+  buf.writeUInt32BE(1, 0);
+  // id
+  buf.writeUInt8(1, 4);
+  return buf;
 };
 
+/*
+    interested: <len=0001><id=2>
+    The interested message is fixed-length and has no payload.
+*/
 const buildInterested = () => {
-  //fixed length, no payload.
-  //Interested: <len=0001><id=2>
-  const buffer = Buffer.alloc(5);
-  buffer.writeUInt32BE(1, 0);
-  buffer.writeUInt8(2, 4); //ID
-  return buffer;
+  const buf = Buffer.alloc(5);
+  // length
+  buf.writeUInt32BE(1, 0);
+  // id
+  buf.writeUInt8(2, 4);
+  return buf;
 };
 
+/*
+    not interested: <len=0001><id=3>
+    The not interested message is fixed-length and has no payload.
+*/
 const buildUninterested = () => {
-  //fixed length, no payload.
-  //Uninterested: <len=0001><id=3>
-  const buffer = Buffer.alloc(5);
-  buffer.writeUInt32BE(1, 0);
-  buffer.writeUInt8(3, 4); //ID
-  return buffer;
+  const buf = Buffer.alloc(5);
+  // length
+  buf.writeUInt32BE(1, 0);
+  // id
+  buf.writeUInt8(3, 4);
+  return buf;
 };
 
+/*
+    have: <len=0005><id=4><piece index>
+    The have message is fixed length. The payload is the zero-based index of a piece
+    that has just been successfully downloaded and verified via the hash.
+*/
 const buildHave = (payload) => {
-  //fixed length, payload = 0based index of recently downloaded piece and verified using hash.
-  //Have: <len=0005><id=4><piece index>
-  const buffer = Buffer.alloc(9);
-  buffer.writeUInt32BE(5, 0);
-  buffer.writeUInt8(4, 4); //ID
-  buffer.writeUInt32BE(payload, 5); //piece index
-  return buffer;
+  const buf = Buffer.alloc(9);
+  // length
+  buf.writeUInt32BE(5, 0);
+  // id
+  buf.writeUInt8(4, 4);
+  // piece index
+  buf.writeUInt32BE(payload, 5);
+  return buf;
 };
 
+/*
+    bitfield: <len=0001+X><id=5><bitfield>
+    The bitfield message may only be sent immediately after the handshaking sequence is completed, 
+    and before any other messages are sent. It is optional, and need not be sent if a client has no pieces.
+
+    The bitfield message is variable length, where X is the length of the bitfield. The payload is a bitfield 
+    representing the pieces that have been successfully downloaded. The high bit in the first byte corresponds 
+    to piece index 0. Bits that are cleared indicated a missing piece, and set bits indicate a valid and available 
+    piece. Spare bits at the end are set to zero.
+*/
 const buildBitfield = (bitfield) => {
-  // Variable length. Sent immediately after hanshake. Optional.
-  //Bitfield: <len=0001+x><id=5><bitfield>
-  const buffer = Buffer.alloc(bitfield.length + 1 + 4);
-  buffer.writeUInt32BE(payload.length + 1, 0);
-  buffer.writeUInt8(5, 4); //ID
-  bitfield.copy(buffer, 5); //bitfield
-  return buffer;
+  const buf = Buffer.alloc(bitfield.length + 1 + 4);
+  // length
+  buf.writeUInt32BE(payload.length + 1, 0);
+  // id
+  buf.writeUInt8(5, 4);
+  // bitfield
+  bitfield.copy(buf, 5);
+  return buf;
 };
 
+/*
+    request: <len=0013><id=6><index><begin><length>
+    The request message is fixed length, and is used to request a block. The payload contains the following information:
+
+    index: integer specifying the zero-based piece index
+    begin: integer specifying the zero-based byte offset within the piece
+    length: integer specifying the requested length.
+*/
 const buildRequest = (payload) => {
-  // fixed length. Used to request a block. Contents of payload: index, begin, length
-  //Request: <len=0013><id=6><index><begin><length>
-  const buffer = Buffer.alloc(17);
-  buffer.writeUInt32BE(13, 0);
-  buffer.writeUInt8(6, 4); //ID
-  buffer.writeUInt32BE(payload.index, 5); //index
-  buffer.writeUInt32BE(payload.begin, 9); //begin
-  buffer.writeUInt32BE(payload.length, 13); //length
-  return buffer;
+  const buf = Buffer.alloc(17);
+  // length
+  buf.writeUInt32BE(13, 0);
+  // id
+  buf.writeUInt8(6, 4);
+  // piece index
+  buf.writeUInt32BE(payload.index, 5);
+  // begin
+  buf.writeUInt32BE(payload.begin, 9);
+  // length
+  buf.writeUInt32BE(payload.length, 13);
+  return buf;
 };
 
+/*
+    piece: <len=0009+X><id=7><index><begin><block>
+    The piece message is variable length, where X is the length of the block. The payload contains the following information:
+
+    index: integer specifying the zero-based piece index
+    begin: integer specifying the zero-based byte offset within the piece
+    block: block of data, which is a subset of the piece specified by index.
+*/
 const buildPiece = (payload) => {
-  // Variable length. Sent after a request. Contents of payload: index, begin, block
-  //Piece: <len=0009+x><id=7><index><begin><block>
-  const buffer = Buffer.alloc(payload.block.length + 13);
-  buffer.writeUInt32BE(payload.block.length + 9, 0);
-  buffer.writeUInt8(7, 4); //ID
-  buffer.writeUInt32BE(payload.index, 5); //index
-  buffer.writeUInt32BE(payload.begin, 9); //begin
-  payload.block.copy(buffer, 13); //block
-  return buffer;
+  const buf = Buffer.alloc(payload.block.length + 13);
+  // length
+  buf.writeUInt32BE(payload.block.length + 9, 0);
+  // id
+  buf.writeUInt8(7, 4);
+  // piece index
+  buf.writeUInt32BE(payload.index, 5);
+  // begin
+  buf.writeUInt32BE(payload.begin, 9);
+  // block
+  payload.block.copy(buf, 13);
+  return buf;
 };
 
+/*
+    cancel: <len=0013><id=8><index><begin><length>
+    The cancel message is fixed length, and is used to cancel block requests. The payload is identical to that of the "request" message. 
+    It is typically used during "End Game".
+*/
 const buildCancel = (payload) => {
-  // fixed length. Used to cancel a block request. Contents of payload: index, begin, length
-  //Cancel: <len=0013><id=8><index><begin><length>
-  const buffer = Buffer.alloc(17);
-  buffer.writeUInt32BE(13, 0);
-  buffer.writeUInt8(8, 4); //ID
-  buffer.writeUInt32BE(payload.index, 5); //index
-  buffer.writeUInt32BE(payload.begin, 9); //begin
-  buffer.writeUInt32BE(payload.length, 13); //length
-  return buffer;
+  const buf = Buffer.alloc(17);
+  // length
+  buf.writeUInt32BE(13, 0);
+  // id
+  buf.writeUInt8(8, 4);
+  // piece index
+  buf.writeUInt32BE(payload.index, 5);
+  // begin
+  buf.writeUInt32BE(payload.begin, 9);
+  // length
+  buf.writeUInt32BE(payload.length, 13);
+  return buf;
 };
 
+/*
+    port: <len=0003><id=9><listen-port>
+    The port message is sent by newer versions of the Mainline that implements a DHT tracker. The listen port is the port this peer's DHT 
+    node is listening on. This peer should be inserted in the local routing table
+*/
 const buildPort = (payload) => {
-  // fixed length. Sent after handshake to announce the port number.
-  //Port: <len=0003><id=9><port>
-  const buffer = Buffer.alloc(7);
-  buffer.writeUInt32BE(3, 0);
-  buffer.writeUInt8(9, 4); //ID
-  buffer.writeUInt16BE(payload, 5); //port
-  return buffer;
+  const buf = Buffer.alloc(7);
+  // length
+  buf.writeUInt32BE(3, 0);
+  // id
+  buf.writeUInt8(9, 4);
+  // listen-port
+  buf.writeUInt16BE(payload, 5);
+  return buf;
 };
 
 const parse = msg => {
-  const id = msg.length > 4 ? msg.readInt8(4) : null;
-  let payload = msg.length > 5 ? msg.slice(5) : null;
-  if (id === 6 || id === 7 || id === 8) {
-    const rest = payload.slice(8);
-    payload = {
-      index: rest.readInt32BE(0),
-      begin: rest.readInt32BE(4),
-    };
-    payload[id === 7 ? "block" : "length"] = rest;
-  }
-
-  return {
-    size: msg.readInt32BE(0),
-    id: id,
-    payload: payload,
-  };
+    const id = msg.length > 4 ? msg.readInt8(4) : null;
+    let payload = msg.length > 5 ? msg.slice(5) : null;
+    if (id === 6 || id === 7 || id === 8) {
+      const rest = payload.slice(8);
+      payload = {
+        index: payload.readInt32BE(0),
+        begin: payload.readInt32BE(4)
+      };
+      payload[id === 7 ? 'block' : 'length'] = rest;
+    }
+  
+    return {
+      size : msg.readInt32BE(0),
+      id : id,
+      payload : payload
+    }
 };
 
 module.exports = {
@@ -160,5 +245,5 @@ module.exports = {
   buildPiece,
   buildCancel,
   buildPort,
-  parse
+  parse,
 };
