@@ -1,12 +1,21 @@
 'use strict';
-const fs = require('fs');
-const bencode = require('bencode');
-const tracker = require('./src/tracker.js');
+
+const download = require('./src/download.js')
 const torrentParser = require('./src/torrent-parser.js')
 
+let filename = process.argv[2];
 
-const torrent = torrentParser.open('./bg3.torrent')
+if(!filename){
+    console.error('Provide a torrent file path as argument');
+    process.exit(1);
+}
 
-tracker.getpeers(torrent, peers=>{
-    console.log('list of peers: ', peers);
-})
+let torrent;
+try {
+    torrent = torrentParser.open(filename);
+} catch (error) {
+    console.error('Error opening torrent file: ', error);
+    process.exit(1);
+}
+
+download.main(torrent, torrent.info.name);
