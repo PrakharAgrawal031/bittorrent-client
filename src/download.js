@@ -11,7 +11,7 @@ const main = (torrent, path) => {
   tracker.getpeers(torrent, (peers) => {
     const pieces = new Pieces(torrent);
     const file = fs.openSync(path, "w");
-    peers.forEach((peer) => handlePeer(peer, torrent, pieces, file));
+    peers.forEach(peer => handlePeer(peer, torrent, pieces, file));
   });
 };
 
@@ -31,7 +31,7 @@ const main = (torrent, path) => {
 function handlePeer(peer, torrent, pieces, file) {
   const socket = new net.Socket();
   socket.on("error", (err) => {
-    console.log(
+    console.error(
       `Error connecting to peer ${peer.ip}:${peer.port} - ${err.message}`
     );
     socket.end();
@@ -43,8 +43,8 @@ function handlePeer(peer, torrent, pieces, file) {
   });
 
   const queue = new Queue(torrent);
-  onWholeMssg(socket, peer.ip, (message) =>
-    mssgHandler(message, socket, pieces, queue, torrent, file)
+  onWholeMssg(socket, peer.ip, mssg =>
+    mssgHandler(mssg, socket, pieces, queue, torrent, file)
   );
 }
 
@@ -98,10 +98,10 @@ function mssgHandler(mssg, socket, pieces, queue, torrent, file) {
   }
 }
 
-function isHandshake(message) {
+function isHandshake(mssg) {
   return (
-    message.length === message.readUInt8(0) + 49 &&
-    message.toString("utf8", 1, 20) === "BitTorrent Protocol"
+    mssg.length === mssg.readUInt8(0) + 49 &&
+    mssg.toString("utf8", 1, 20) === "BitTorrent Protocol"
   );
 }
 
@@ -132,9 +132,11 @@ function bitfieldHandler(socket, pieces, queue, payload) {
   if (queueEmpty) requestPiece(socket, pieces, queue);
 }
 
-function pieceHandler(socket, pieces, queue, torrent, file, payload) {
+function pieceHandler(socket, pieces, queue, torrent, file, pieceResponse) {
   pieces.printPercentDone();
-  pieces.addRecieve(pieceResponse);
+  console.log(`Received piece response with index: ${pieceResponse.index} and begin: ${pieceResponse.begin}`);
+
+  pieces.addRecieved(pieceResponse);
 
   const offset =
     pieceResponse.index * torrent.info[" piece length "] + pieceResponse.begin;
@@ -145,7 +147,7 @@ function pieceHandler(socket, pieces, queue, torrent, file, payload) {
     pieceResponse.block.length,
     offset,
     (err) => {
-      if (err) console.log("Error writing to file:", err);
+      if (err) console.error("Error writing to file:", err);
     }
   );
 
@@ -160,13 +162,13 @@ function pieceHandler(socket, pieces, queue, torrent, file, payload) {
   } else {
     requestPiece(socket, pieces, queue);
   }
-}
+};
 
 function requestPiece(socket, pieces, queue) {
   if (queue.choked) return null;
 
   while (queue.length()) {
-    const pieceBlock = queue.deque();
+    const pieceBlock = queue.dequeue();
     if (pieces.needed(pieceBlock)) {
       socket.write(message.buildRequest(pieceBlock));
       pieces.addRequested(pieceBlock);
