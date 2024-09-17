@@ -56,7 +56,7 @@ const pieceLen = (torrent, pieceIndex) => {
 
 const blocksPerPiece = (torrent, pieceIndex) => {
   const pieceLength = pieceLen(torrent, pieceIndex);
-  return Math.cell(pieceLength / BLOCK_LENGTH);
+  return Math.ceil(pieceLength / BLOCK_LENGTH);
 };
 
 const blockLen = (torrent, pieceIndex, blockIndex) => {

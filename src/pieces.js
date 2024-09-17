@@ -6,7 +6,7 @@ module.exports = class {
     constructor(size){
 
         function buildPieceArray(){
-            const nPieces = Math.cell(torrent.info.pieces.length /20);
+            const nPieces = Math.ceil(torrent.info.pieces.length /20);
             const arr = new Array(nPieces).fill(null);
             return arr.map((_,i)=> new Array(torrentParser.blocksPerPiece(torrent, i)).fill(false))
         }
