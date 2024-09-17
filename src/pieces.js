@@ -1,53 +1,63 @@
-'use strict';
+"use strict";
 
-const torrentParser = require('./torrent-parser.js');
+const tp = require("./torrent-parser");
 
 module.exports = class {
-    constructor(size){
-
-        function buildPieceArray(){
-            const nPieces = Math.ceil(torrent.info.pieces.length /20);
-            const arr = new Array(nPieces).fill(null);
-            return arr.map((_,i)=> new Array(torrentParser.blocksPerPiece(torrent, i)).fill(false))
-        }
-
-        this.requested = new Array(size).fill(false);
-        this.recieved = new Array(size).fill(false);
+  constructor(torrent) {
+    function buildPiecesArray() {
+      const nPieces = Math.ceil(torrent.info.pieces.length / 20);
+      const arr = new Array(nPieces).fill(null);
+      return arr.map((_, i) =>
+        new Array(tp.blocksPerPiece(torrent, i)).fill(false)
+      );
     }
 
-    addRequested(pieceBlock){
-        const blockIndex = pieceBlock.begin / torrentParser.BLOCK_LENGTH;
-        this.requested[pieceBlock.index][blockIndex]=true;
+    this._requested = buildPiecesArray();
+    this._received = buildPiecesArray();
+  }
+
+  addRequested(pieceBlock) {
+    const blockIndex = pieceBlock.begin / tp.BLOCK_LENGTH;
+    this._requested[pieceBlock.index][blockIndex] = true;
+  }
+
+  addRecieved(pieceBlock) {
+    const blockIndex = pieceBlock.begin / tp.BLOCK_LENGTH;
+    if (
+      this._received[pieceBlock.index] &&
+      this._received[pieceBlock.index][blockIndex] !== undefined
+    ) {
+      this._received[pieceBlock.index][blockIndex] = true;
+    } else {
+      console.error(
+        `Invalid pieceBlock.index: ${pieceBlock.index} or blockIndex: ${blockIndex}`
+      );
     }
+  }
 
-    addRecieved(pieceBlock){
-        const blockIndex = pieceBlock.begin / torrentParser.BLOCK_LENGTH;
-        this.recieved[pieceBlock.index][blockIndex]=true;
+  needed(pieceBlock) {
+    if (this._requested.every((blocks) => blocks.every((i) => i))) {
+      // check if every block has been requested
+      this._requested = this._received.map((blocks) => blocks.subarray()); //update to received array so that blocks not received can be requested again
     }
+    const blockIndex = pieceBlock.begin / tp.BLOCK_LENGTH;
+    return !this._requested[pieceBlock.index][blockIndex];
+  }
 
-    needed(pieceBlock){
-        if(this.requested.every(blocks => blocks.every(i => i))){
-            this.requested = this.recieved.map(blocks => blocks.subarray());
-        }
-        const blockIndex = pieceBlock.begin / torrentParser.BLOCK_LENGTH;
-        return !this.requested[pieceBlock.index][blockIndex];
-    }
+  isDone() {
+    return this._received.every((blocks) => blocks.every((i) => i));
+  }
+  printPercentDone() {
+    const downloaded = this._received.reduce((totalBlocks, blocks) => {
+      return blocks.filter((i) => i).length + totalBlocks;
+    }, 0);
 
-    isDone(){
-        return this.received.every(blocks => blocks.every(i => i));
-    }
+    const total = this._received.reduce((totalBlocks, blocks) => {
+      return blocks.length + totalBlocks;
+    }, 0);
 
-    printPercentDone() {
-        const downloaded = this.recieved.reduce((totalBlocks, blocks) => {
-            return blocks.filter(i => i).length + totalBlocks;
-        }, 0);
+    const percent = Math.floor((downloaded / total) * 100);
 
-        const total = this.requested.reduce((totalBlocks, blocks) => {
-            return blocks.length + totalBlocks;
-        }, 0);
-
-        const percent = Math.floor(downloaded / total * 100);
-
-        process.stdout.write('progress' + percent + '%\r');
-      }
+    process.stdout.write("progress: " + percent + "%\r");
+  }
 };
