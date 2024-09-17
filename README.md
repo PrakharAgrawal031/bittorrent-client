@@ -43,10 +43,10 @@ This is a BitTorrent client implemented in Node.js. The client can parse `.torre
 
 
 ## Roadmap
-- [ ] Implement peer handshaking.
-- [ ] Manage piece requests and downloads.
-- [ ] File assembly and verification.
-- [ ] Improve error handling and performance.
+- [x] Implement peer handshaking.
+- [x] Manage piece requests and downloads.
+- [x] File assembly and verification.
+- [x] Improve error handling and performance.
 
 ## Contributing
 
