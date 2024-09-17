@@ -75,8 +75,8 @@ const buildHave = (payload) => {
 const buildBitfield = (bitfield) => {
   // Variable length. Sent immediately after hanshake. Optional.
   //Bitfield: <len=0001+x><id=5><bitfield>
-  const buffer = Buffer.alloc(bitfield.length + 5);
-  buffer.writeUInt32BE(bitfield.length + 1, 0);
+  const buffer = Buffer.alloc(bitfield.length + 1 + 4);
+  buffer.writeUInt32BE(payload.length + 1, 0);
   buffer.writeUInt8(5, 4); //ID
   bitfield.copy(buffer, 5); //bitfield
   return buffer;
@@ -130,9 +130,9 @@ const buildPort = (payload) => {
 
 const parse = msg => {
   const id = msg.length > 4 ? msg.readInt8(4) : null;
-  let payload = msg.length > 5 ? msg.subarray(5) : null;
+  let payload = msg.length > 5 ? msg.slice(5) : null;
   if (id === 6 || id === 7 || id === 8) {
-    const rest = payload.subarray(8);
+    const rest = payload.slice(8);
     payload = {
       index: rest.readInt32BE(0),
       begin: rest.readInt32BE(4),
